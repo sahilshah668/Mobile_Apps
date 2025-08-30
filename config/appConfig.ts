@@ -60,7 +60,57 @@ export const APP_CONFIG = {
     },
     "appName": "StoresA2Z Demo"
   },
-  "fonts": []
+  "fonts": [],
+  // NEW: App Request specific configurations
+  "appRequest": {
+    "identifiers": {
+      "androidPackageName": "",
+      "iosBundleId": ""
+    },
+    "icons": {
+      "appIconUrl": "",
+      "adaptiveForegroundUrl": "",
+      "adaptiveBackgroundColor": ""
+    },
+    "splash": {
+      "imageUrl": "",
+      "backgroundColor": "",
+      "resizeMode": "contain" as "contain" | "cover",
+      "darkImageUrl": "",
+      "darkBackgroundColor": ""
+    },
+    "fonts": [] as Array<{
+      "familyName": string;
+      "url": string;
+      "weight": number;
+      "style": "normal" | "italic";
+    }>,
+    "permissions": {
+      "camera": false,
+      "photos": false,
+      "files": false,
+      "location": false,
+      "notifications": false
+    },
+    "analytics": {
+      "ga4Id": "",
+      "sentryDsn": ""
+    },
+    "push": {
+      "fcmServerKey": "",
+      "android": {
+        "enable": false,
+        "topicOrders": false,
+        "topicPromotions": false
+      },
+      "apns": {
+        "keyId": "",
+        "teamId": "",
+        "bundleId": "",
+        "p8Url": ""
+      }
+    }
+  }
 };
 
 export default APP_CONFIG;

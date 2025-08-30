@@ -589,8 +589,25 @@ const productSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchCategoryDetails.fulfilled, (state, action) => {
+        console.log('🔍 Redux: fetchCategoryDetails fulfilled with payload:', action.payload);
+        const payload = action.payload as any;
+        console.log('🔍 Redux: Payload structure:', {
+          hasCategory: !!payload?.category,
+          hasProducts: !!payload?.products,
+          productsLength: payload?.products?.length,
+          hasPagination: !!payload?.pagination
+        });
+        
+        // FIX: Map product IDs from _id to id for consistency
+        if (payload?.products && Array.isArray(payload.products)) {
+          payload.products = payload.products.map((product: any) => ({
+            ...product,
+            id: product._id || product.id // Ensure id field exists
+          }));
+        }
+        
         state.loading = false;
-        state.categoryDetails = action.payload as any;
+        state.categoryDetails = payload;
       })
       .addCase(fetchCategoryDetails.rejected, (state, action) => {
         state.loading = false;

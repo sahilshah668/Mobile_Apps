@@ -1,7 +1,7 @@
 import { APP_CONFIG } from '../config/appConfig';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens, isJwtExpired } from './token';
 
-const BASE_URL = (process.env.EXPO_PUBLIC_API_URL as string) || 'http://192.168.0.182:4000';
+const BASE_URL = (process.env.EXPO_PUBLIC_API_URL as string) || 'http://192.168.0.104:4000';
 // 192.168.0.182
 // 192.168.0.104
 function withStore(path: string) {
@@ -423,8 +423,7 @@ export async function getCategoryProducts(categoryId: string, params?: Record<st
   
   try {
     const result = await json(await apiFetch(url));
-    console.log('Category products API result:', result);
-    return result;
+    return result?.data;
   } catch (error) {
     console.error('Error in getCategoryProducts:', error);
     throw error;

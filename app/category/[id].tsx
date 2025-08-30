@@ -40,9 +40,9 @@ const CategoryDetailScreen: React.FC = () => {
   const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
+  console.log('categoryDetails', categoryDetails);
   // Use real category data from API or fallback to explore data
-  const category = categoryDetails?.category || exploreData?.categories.find(cat => cat.id === id) || {
+  const category = categoryDetails?.data?.category || exploreData?.categories.find(cat => cat.id === id) || {
     id: id || '1',
     name: 'Loading...',
     image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&h=200&fit=crop',
@@ -52,6 +52,19 @@ const CategoryDetailScreen: React.FC = () => {
 
   // Use real products from API
   const categoryProducts = categoryDetails?.products || [];
+
+  // Add debugging for the fixed data access
+  useEffect(() => {
+    console.log('🔍 Category page - Fixed data access:', {
+      categoryId: id,
+      categoryName: category?.name,
+      categoryProductCount: category?.productCount,
+      actualProductsLength: categoryProducts.length,
+      hasCategoryDetails: !!categoryDetails,
+      categoryDetailsKeys: categoryDetails ? Object.keys(categoryDetails) : [],
+      firstProductId: categoryProducts[0]?.id || 'No product'
+    });
+  }, [id, category, categoryProducts, categoryDetails]);
 
   useEffect(() => {
     if (id) {
@@ -65,6 +78,8 @@ const CategoryDetailScreen: React.FC = () => {
   };
 
   const handleProductPress = (productId: string) => {
+    console.log('productId::::', productId);
+
     router.push(`/product/${productId}` as any);
   };
 
