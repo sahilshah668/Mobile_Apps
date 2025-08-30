@@ -41,10 +41,11 @@ const HomeScreen: React.FC = () => {
   const { homeData, loading } = useSelector((state: RootState) => state.products);
   const { isAuthenticated, navigateToAuth } = useAuth();
   const router = useRouter();
-
+  console.log('homeData', homeData);
   useEffect(() => {
+    console.log('fetching home data');
     dispatch(fetchHomeData());
-  }, [dispatch]);
+  }, []);
 
   const handleRefresh = () => {
     dispatch(fetchHomeData());
@@ -127,7 +128,7 @@ const HomeScreen: React.FC = () => {
       {/* Premium Header with Gradient */}
       <View style={styles.headerContainer}>
         <LinearGradient
-          colors={['rgba(21, 107, 255, 0.95)', 'rgba(21, 107, 255, 0.8)']}
+          colors={[`${theme.colors.primary}E6`, `${theme.colors.primary}CC`]}
           style={styles.headerGradient}
         >
           <View style={styles.header}>

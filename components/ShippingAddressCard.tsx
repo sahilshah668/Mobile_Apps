@@ -1,11 +1,11 @@
 import theme from '@/constants/theme';
-import { ShippingAddress } from '@/store/cartSlice';
+import { Address } from '@/components/AddressForm';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ShippingAddressCardProps {
-  address: ShippingAddress;
+  address: Address;
   onEdit: () => void;
 }
 
@@ -22,7 +22,16 @@ const ShippingAddressCard: React.FC<ShippingAddressCardProps> = ({
         </TouchableOpacity>
       </View>
       
+      <Text style={styles.nameText}>{address.fullName}</Text>
+      <Text style={styles.phoneText}>{address.phone}</Text>
       <Text style={styles.addressText}>{address.address}</Text>
+      {address.addressLine2 && (
+        <Text style={styles.addressText}>{address.addressLine2}</Text>
+      )}
+      <Text style={styles.cityText}>
+        {address.city}, {address.state} {address.zipCode}
+      </Text>
+      <Text style={styles.countryText}>{address.country}</Text>
     </View>
   );
 };
@@ -65,7 +74,34 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  nameText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.fonts.bold,
+    marginBottom: 4,
+  },
+  phoneText: {
+    fontSize: 14,
+    color: theme.colors.subtitle,
+    fontFamily: theme.fonts.regular,
+    marginBottom: theme.spacing.sm,
+  },
   addressText: {
+    fontSize: 14,
+    color: theme.colors.subtitle,
+    fontFamily: theme.fonts.regular,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  cityText: {
+    fontSize: 14,
+    color: theme.colors.subtitle,
+    fontFamily: theme.fonts.regular,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  countryText: {
     fontSize: 14,
     color: theme.colors.subtitle,
     fontFamily: theme.fonts.regular,

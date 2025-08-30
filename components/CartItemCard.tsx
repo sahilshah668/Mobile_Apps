@@ -25,7 +25,12 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: item.product.image }} style={styles.image} />
+        <Image 
+          source={{ 
+            uri: item.product?.images?.[0] || item.product?.image || 'https://via.placeholder.com/80x80?text=No+Image' 
+          }} 
+          style={styles.image} 
+        />
         <TouchableOpacity
           style={styles.removeButton}
           onPress={() => onRemove(item.id)}
@@ -36,16 +41,16 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       
       <View style={styles.content}>
         <Text style={styles.productName} numberOfLines={2}>
-          Lorem ipsum dolor sit amet consectetur.
+          {item.product?.name || 'Product Name Unavailable'}
         </Text>
         
         <Text style={styles.variant}>
-          {item.selectedColor || 'Pink'}, Size {item.selectedSize || 'M'}
+          {item.selectedColor || 'Default'}, Size {item.selectedSize || 'Default'}
         </Text>
         
         <View style={styles.priceRow}>
           <Text style={styles.price}>
-            ${item.product.price.toFixed(2).replace('.', ',')}
+            ${(item.product?.price || 0).toFixed(2).replace('.', ',')}
           </Text>
           
           <View style={styles.quantityContainer}>
@@ -53,7 +58,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
               style={styles.quantityButton}
               onPress={() => handleQuantityChange(-1)}
             >
-              <Ionicons name="remove" size={16} color={theme.colors.primary} />
+              <Ionicons name="remove" size={16} color="white" />
             </TouchableOpacity>
             
             <View style={styles.quantityDisplay}>
@@ -64,7 +69,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
               style={styles.quantityButton}
               onPress={() => handleQuantityChange(1)}
             >
-              <Ionicons name="add" size={16} color={theme.colors.primary} />
+              <Ionicons name="add" size={16} color="white" />
             </TouchableOpacity>
           </View>
         </View>

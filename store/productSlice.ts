@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { getCategories, getProduct, getProducts } from '../services/api';
+import { getCategories, getProducts, getProduct, getBanners, trackBannerClick, searchProducts as searchProductsAPI, getCategoryProducts } from '../services/api';
+import { APP_CONFIG } from '../config/appConfig';
 
 // Types
 export interface Product {
@@ -20,9 +21,14 @@ export interface Product {
   isNew?: boolean;
   isHot?: boolean;
   isSale?: boolean;
+  isFeatured?: boolean;
   discount?: number;
   tags?: string[];
   description?: string;
+  slug?: string;
+  status?: string;
+  returnable?: boolean;
+  returnWindowDays?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -95,6 +101,18 @@ interface ProductState {
   currentProducts: Product[];
   totalProducts: number;
   currentPage: number;
+  categoryDetails: {
+    category: Category | null;
+    products: Product[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  } | null;
 }
 
 const initialState: ProductState = {
@@ -124,6 +142,7 @@ const initialState: ProductState = {
   currentProducts: [],
   totalProducts: 0,
   currentPage: 1,
+  categoryDetails: null,
 };
 
 // Async thunks for API calls
@@ -131,31 +150,103 @@ export const fetchHomeData = createAsyncThunk(
   'products/fetchHomeData',
   async (_, { rejectWithValue }) => {
     try {
-      const [cats, prods]: any = await Promise.all([
+      console.log('fetching home data 2');
+      const storeId = APP_CONFIG?.store?.id;
+      console.log('storeId', storeId);
+      if (!storeId) {
+        throw new Error('Store ID not found in app configuration');
+      }
+
+      console.log('About to make API calls...');
+      
+      // Test each API call individually to identify which one fails
+      try {
+        console.log('Testing getCategories...');
+        const cats = await getCategories();
+        console.log('getCategories success:', cats);
+      } catch (error) {
+        console.log('getCategories error:', error);
+      }
+      
+      try {
+        console.log('Testing getProducts...');
+        const prods = await getProducts({ limit: 12 });
+        console.log('getProducts success:', prods);
+      } catch (error) {
+        console.log('getProducts error:', error);
+      }
+      
+      try {
+        console.log('Testing getBanners...');
+        const banners = await getBanners(storeId);
+        console.log('getBanners success:', banners);
+      } catch (error) {
+        console.log('getBanners error:', error);
+      }
+      
+      // Use Promise.allSettled to handle partial failures gracefully
+      console.log('Making Promise.allSettled call...');
+      const results = await Promise.allSettled([
         getCategories(),
-        getProducts({ limit: 12, sort: 'popular' }),
+        getProducts({ limit: 12 }),
+        getBanners(storeId),
       ]);
-      const categories = (cats?.data || cats || []).map((c: any) => ({
-        id: c._id || c.id,
-        name: c.name,
-        image: c.image || '',
-        productCount: c.productCount || 0,
-      }));
-      const featured = (prods?.data || prods || [])?.products || (prods?.products || prods) || [];
+      
+      const [catsResult, prodsResult, bannersResult] = results;
+      
+      console.log('Promise.allSettled completed');
+      console.log('Categories result:', catsResult.status, catsResult.status === 'fulfilled' ? catsResult.value : catsResult.reason);
+      console.log('Products result:', prodsResult.status, prodsResult.status === 'fulfilled' ? prodsResult.value : prodsResult.reason);
+      console.log('Banners result:', bannersResult.status, bannersResult.status === 'fulfilled' ? bannersResult.value : bannersResult.reason);
+      
+      // Handle categories
+      let categories: any[] = [];
+      if (catsResult.status === 'fulfilled') {
+        const cats = catsResult.value as any;
+        categories = (cats?.categories || cats?.data || cats || []).map((c: any) => ({
+          id: c._id || c.id,
+          name: c.name,
+          image: c.image || '',
+          productCount: c.productCount || 0,
+        }));
+      }
+      
+      // Handle products
+      let featured: any[] = [];
+      if (prodsResult.status === 'fulfilled') {
+        const prods = prodsResult.value as any;
+        featured = (prods?.products || prods?.data?.products || prods || []);
+      }
+      
       const mapP = (p: any) => ({
         id: p._id || p.id,
         name: p.name,
         price: p.price,
-        image: (p.images && p.images[0]) || p.image || '',
-        category: p.category?.name || p.category || '',
+        image: (p.images && p.images[0]) || p.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
+        category: p.category?.name || p.category || 'Uncategorized',
         inStock: p.inStock ?? true,
         rating: p.rating || 0,
         reviews: p.reviews || 0,
         createdAt: p.createdAt || '',
         updatedAt: p.updatedAt || '',
       });
+
+      // Handle banners
+      let mappedBanners: any[] = [];
+      if (bannersResult.status === 'fulfilled') {
+        const banners = bannersResult.value as any;
+        mappedBanners = (banners?.data || banners || []).map((b: any) => ({
+          id: b._id || b.id,
+          title: b.title,
+          subtitle: b.subtitle,
+          image: b.image,
+          backgroundColor: b.backgroundColor,
+          link: b.link,
+        }));
+      }
+      console.log('featured', featured);
       const home: HomeData = {
-        banners: [],
+        banners: mappedBanners,
         categories,
         featuredProducts: featured.slice(0, 6).map(mapP),
         newArrivals: featured.slice(6, 9).map(mapP),
@@ -163,6 +254,8 @@ export const fetchHomeData = createAsyncThunk(
         mostPopular: featured.slice(9, 12).map(mapP),
         recommendations: featured.slice(0, 6).map(mapP),
       };
+      console.log('home', home);
+      console.log('Featured products:', home.featuredProducts.map(p => ({ id: p.id, name: p.name, price: p.price })));
       return home;
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch home data');
@@ -174,36 +267,70 @@ export const fetchExploreData = createAsyncThunk(
   'products/fetchExploreData',
   async (_, { rejectWithValue }) => {
     try {
-      // Return dummy explore data
-      const dummyExploreData: ExploreData = {
-        categories: [
-          { id: '1', name: 'Clothing', image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=200&h=200&fit=crop', productCount: 45 },
-          { id: '2', name: 'Shoes', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=200&h=200&fit=crop', productCount: 32 },
-          { id: '3', name: 'Bags', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200&h=200&fit=crop', productCount: 28 },
-          { id: '4', name: 'Accessories', image: 'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=200&h=200&fit=crop', productCount: 67 },
-          { id: '5', name: 'Jewelry', image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=200&h=200&fit=crop', productCount: 23 },
-          { id: '6', name: 'Watches', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=200&h=200&fit=crop', productCount: 18 },
-        ],
-        featuredProducts: [
-          { id: '1', name: 'Classic Denim Jacket', price: 65, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.6, reviews: 89, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-          { id: '2', name: 'Elegant Evening Dress', price: 120, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.9, reviews: 156, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        ],
-        trendingProducts: [
-          { id: '3', name: 'Casual Summer Dress', price: 45, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.4, reviews: 67, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-          { id: '4', name: 'Bohemian Maxi Dress', price: 68, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.3, reviews: 23, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        ],
-        newArrivals: [
-          { id: '5', name: 'Cozy Winter Sweater', price: 35, originalPrice: 70, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.4, reviews: 156, isNew: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-          { id: '6', name: 'Red Dress', price: 65, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.7, reviews: 89, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        ],
-        saleProducts: [
-          { id: '7', name: 'Pink Top', price: 28, originalPrice: 45, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.5, reviews: 67, isSale: true, discount: 38, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-          { id: '8', name: 'Black Hat', price: 25, originalPrice: 40, image: 'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=200&h=200&fit=crop', category: 'Accessories', inStock: true, rating: 4.2, reviews: 45, isSale: true, discount: 37, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        ],
-      };
+      console.log('fetching explore data');
+      const storeId = APP_CONFIG?.store?.id;
+      if (!storeId) {
+        throw new Error('Store ID not found in app configuration');
+      }
+
+      // Fetch categories
+      const categoriesRes: any = await getCategories();
+      console.log('📋 Raw categories response:', categoriesRes);
       
-      return dummyExploreData;
+      const categories = (categoriesRes?.categories || categoriesRes?.data || categoriesRes || []).map((cat: any) => ({
+        id: cat._id || cat.id,
+        name: cat.name,
+        image: cat.image || 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=200&h=200&fit=crop',
+        productCount: cat.productCount || 0,
+      }));
+      
+      console.log('📋 Mapped categories:', categories);
+
+      // Fetch all products (same as home data)
+      const productsRes: any = await getProducts({ limit: 20 });
+      const allProducts = (productsRes?.products || productsRes?.data?.products || productsRes || []);
+
+      const mapProduct = (p: any) => ({
+        id: p._id || p.id,
+        name: p.name,
+        price: p.price,
+        image: (p.images && p.images[0]) || p.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
+        category: p.category?.name || p.category || 'Uncategorized',
+        inStock: p.inStock ?? true,
+        rating: p.rating || 0,
+        reviews: p.reviews || 0,
+        createdAt: p.createdAt || '',
+        updatedAt: p.updatedAt || '',
+      });
+
+      // Categorize products based on their properties
+      const mappedProducts = allProducts.map(mapProduct);
+      
+      // Split products into different categories
+      const featuredProducts = mappedProducts.slice(0, 6);
+      const trendingProducts = mappedProducts.slice(6, 12);
+      const newArrivals = mappedProducts.slice(12, 18);
+      const saleProducts = mappedProducts.slice(18, 24);
+
+      const exploreData: ExploreData = {
+        categories,
+        featuredProducts,
+        trendingProducts,
+        newArrivals,
+        saleProducts,
+      };
+
+      console.log('explore data loaded:', {
+        categoriesCount: categories.length,
+        featuredCount: featuredProducts.length,
+        trendingCount: trendingProducts.length,
+        newArrivalsCount: newArrivals.length,
+        saleCount: saleProducts.length,
+      });
+
+      return exploreData;
     } catch (error) {
+      console.error('Error fetching explore data:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch explore data');
     }
   }
@@ -245,15 +372,24 @@ export const searchProducts = createAsyncThunk(
   'products/searchProducts',
   async (params: { query: string; filters?: any; page?: number }, { rejectWithValue }) => {
     try {
-      // Return dummy search results
-      const dummySearchResults = [
-        { id: '1', name: 'Classic Denim Jacket', price: 65, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.6, reviews: 89, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-        { id: '2', name: 'Elegant Evening Dress', price: 120, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', inStock: true, rating: 4.9, reviews: 156, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-      ];
+      const res: any = await searchProductsAPI(params.query, params.filters);
+      const items = (res?.data || res || {}).products || res?.products || res || [];
+      const mapped = items.map((p: any) => ({
+        id: p._id || p.id,
+        name: p.name,
+        price: p.price,
+        image: (p.images && p.images[0]) || p.image || '',
+        category: p.category?.name || p.category || '',
+        inStock: p.inStock ?? true,
+        rating: p.rating || 0,
+        reviews: p.reviews || 0,
+        createdAt: p.createdAt || '',
+        updatedAt: p.updatedAt || '',
+      }));
       
       return {
-        products: dummySearchResults,
-        total: dummySearchResults.length,
+        products: mapped,
+        total: Number(res?.total || mapped.length),
         page: params.page || 1,
         query: params.query,
       };
@@ -267,30 +403,49 @@ export const fetchProductDetails = createAsyncThunk(
   'products/fetchProductDetails',
   async (productId: string, { rejectWithValue }) => {
     try {
+      console.log('fetchProductDetails called with ID:', productId);
       const res: any = await getProduct(productId);
-      const p = (res?.data || res || {});
+      console.log('getProduct result:', res);
+      
+      // Extract product data from the response structure
+      // The API returns: { product: { ... } }
+      const productData = res?.product || res?.data || res || {};
+      console.log('Product data extracted:', productData);
+      
       const mapped = {
-        id: p._id || p.id,
-        name: p.name,
-        price: p.price,
-        originalPrice: p.originalPrice,
-        discount: p.discount,
-        image: (p.images && p.images[0]) || p.image || '',
-        images: p.images || [],
-        category: p.category?.name || p.category || '',
-        brand: p.brand || '',
-        rating: p.rating || 0,
-        reviews: p.reviews || 0,
-        isNew: p.isNew || false,
-        inStock: p.inStock ?? true,
-        description: p.description || '',
-        sizes: p.sizes || [],
-        colors: p.colors || [],
-        createdAt: p.createdAt || '',
-        updatedAt: p.updatedAt || '',
+        id: productData._id || productData.id,
+        name: productData.name || '',
+        price: productData.price || 0,
+        originalPrice: productData.compareAtPrice || productData.originalPrice || 0,
+        discount: productData.discount || 0,
+        image: (productData.images && productData.images[0]) || productData.image || '',
+        images: productData.images || [],
+        category: productData.category?.name || productData.category || '',
+        brand: productData.brand || '',
+        rating: productData.rating || 0,
+        reviews: productData.reviews || 0,
+        isNew: productData.isNew || false,
+        isFeatured: productData.isFeatured || false,
+        inStock: productData.inStock ?? true,
+        description: productData.description || '',
+        sizes: productData.sizes || [],
+        colors: productData.colors || [],
+        tags: productData.tags || [],
+        slug: productData.slug || '',
+        status: productData.status || 'published',
+        returnable: productData.returnable || false,
+        returnWindowDays: productData.returnWindowDays || 0,
+        createdAt: productData.createdAt || '',
+        updatedAt: productData.updatedAt || '',
       } as Product;
+      
+      console.log('Mapped product:', mapped);
+      console.log('Mapped product name:', mapped.name);
+      console.log('Mapped product price:', mapped.price);
+      console.log('Mapped product description:', mapped.description);
       return mapped;
     } catch (error) {
+      console.error('Error in fetchProductDetails:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch product details');
     }
   }
@@ -300,17 +455,18 @@ export const fetchCategoryDetails = createAsyncThunk(
   'products/fetchCategoryDetails',
   async (categoryId: string, { rejectWithValue }) => {
     try {
-      // Return dummy category details
-      const dummyCategory = {
-        id: categoryId,
-        name: 'Clothing',
-        description: 'Trendy fashion for every occasion',
-        image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&h=200&fit=crop',
-        productCount: 109,
-      };
+      console.log('Fetching category details for:', categoryId);
+      const result = await getCategoryProducts(categoryId, {
+        page: 1,
+        limit: 50,
+        sort: 'newest',
+        order: 'desc'
+      });
       
-      return dummyCategory;
+      console.log('Category details result:', result);
+      return result;
     } catch (error) {
+      console.error('Error fetching category details:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch category details');
     }
   }
@@ -434,7 +590,7 @@ const productSlice = createSlice({
       })
       .addCase(fetchCategoryDetails.fulfilled, (state, action) => {
         state.loading = false;
-        // You might want to store category details in a separate field
+        state.categoryDetails = action.payload as any;
       })
       .addCase(fetchCategoryDetails.rejected, (state, action) => {
         state.loading = false;
@@ -452,5 +608,18 @@ export const {
   setCurrentPage,
   clearError,
 } = productSlice.actions;
+
+// Banner click tracking thunk
+export const trackBannerClickThunk = createAsyncThunk(
+  'products/trackBannerClick',
+  async (bannerId: string, { rejectWithValue }) => {
+    try {
+      await trackBannerClick(bannerId);
+      return bannerId;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to track banner click');
+    }
+  }
+);
 
 export default productSlice.reducer; 

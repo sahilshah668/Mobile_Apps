@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 import {
     Image,
     ScrollView,
@@ -8,27 +8,153 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import theme from '@/constants/theme';
 import { selectCurrentOrder } from '@/store/orderSlice';
+import { selectCartItems } from '@/store/cartSlice';
+import { 
+  initializeRazorpayPayment, 
+  handlePaymentSuccess, 
+  showPaymentError,
+  showPaymentSuccess,
+  isRazorpayAvailable,
+  mockPayment
+} from '@/services/razorpayService';
+import { APP_CONFIG } from '@/config/appConfig';
 
 const OrderConfirmationScreen: React.FC = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const currentOrder = useSelector(selectCurrentOrder);
+  const cartItems = useSelector(selectCartItems);
+  
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
 
-  if (!currentOrder) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>No order found</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push('/(tabs)/home')}>
-          <Text style={styles.backButtonText}>Go to Home</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Extract payment details from params
+  const orderId = params.orderId as string;
+  const paymentOrderId = params.paymentOrderId as string;
+  const amount = params.amount as string;
+  const key = params.key as string;
+
+  useEffect(() => {
+    if (paymentOrderId && key) {
+      // Initialize payment processing
+      handlePaymentProcessing();
+    }
+  }, [paymentOrderId, key]);
+
+  const handlePaymentProcessing = async () => {
+    if (!paymentOrderId || !key) {
+      setPaymentStatus('failed');
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setPaymentStatus('processing');
+
+    try {
+      // Get store ID from app config
+      const storeId = APP_CONFIG?.store?.id;
+      if (!storeId) {
+        throw new Error('Store ID not found in app configuration');
+      }
+
+      console.log('🔍 Starting payment processing...');
+      console.log('🔍 Payment Order ID:', paymentOrderId);
+      console.log('🔍 Amount:', amount);
+      console.log('🔍 Store ID:', storeId);
+
+      // Check Razorpay availability first
+      const razorpayAvailable = isRazorpayAvailable();
+      console.log('🔍 Razorpay available:', razorpayAvailable);
+
+      if (!razorpayAvailable) {
+        console.log('🔍 Using mock payment for emulator/development');
+        // Use mock payment directly for emulator
+        const mockResponse = await mockPayment({
+          key: key,
+          amount: parseInt(amount),
+          currency: 'INR',
+          order_id: paymentOrderId,
+          name: APP_CONFIG?.store?.name || 'Store',
+          description: 'Payment for your order',
+          prefill: {
+            name: 'Customer Name',
+            email: 'customer@example.com',
+            contact: '9999999999',
+          },
+          notes: {
+            orderId: orderId,
+            storeId: storeId,
+          },
+          theme: {
+            color: APP_CONFIG?.theme?.colors?.primary || '#eb2424',
+          },
+        });
+
+        console.log('🔍 Mock payment completed:', mockResponse);
+        setPaymentStatus('success');
+        showPaymentSuccess(orderId);
+        return;
+      }
+
+      console.log('🔍 Using real Razorpay payment');
+      // Initialize real Razorpay payment
+      const paymentResponse = await initializeRazorpayPayment({
+        key: key,
+        amount: parseInt(amount),
+        currency: 'INR',
+        order_id: paymentOrderId,
+        name: APP_CONFIG?.store?.name || 'Store',
+        description: 'Payment for your order',
+        prefill: {
+          name: 'Customer Name', // You can get this from user profile
+          email: 'customer@example.com', // You can get this from user profile
+          contact: '9999999999', // You can get this from user profile
+        },
+        notes: {
+          orderId: orderId,
+          storeId: storeId,
+        },
+        theme: {
+          color: APP_CONFIG?.theme?.colors?.primary || '#eb2424',
+        },
+      });
+
+      console.log('🔍 Payment response received:', paymentResponse);
+
+      // Check if this is a mock payment (for development)
+      if (paymentResponse.razorpay_payment_id.startsWith('pay_mock_')) {
+        console.log('🔍 Mock payment completed, skipping verification');
+        setPaymentStatus('success');
+        showPaymentSuccess(orderId);
+        return;
+      }
+
+      // Verify real payment with backend
+      console.log('🔍 Verifying real payment with backend...');
+      const verificationResult = await handlePaymentSuccess(paymentResponse, storeId);
+
+      // Payment successful
+      setPaymentStatus('success');
+      showPaymentSuccess(orderId);
+      
+      console.log('🔍 Payment verification result:', verificationResult);
+      
+    } catch (error: any) {
+      console.error('❌ Payment processing error:', error);
+      setPaymentStatus('failed');
+      showPaymentError(error);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -48,13 +174,13 @@ const OrderConfirmationScreen: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return 'checkmark-circle';
+        return 'checkmark';
       case 'processing':
         return 'time';
       case 'shipped':
         return 'car';
       case 'delivered':
-        return 'checkmark-done-circle';
+        return 'checkmark';
       default:
         return 'ellipse';
     }
@@ -70,7 +196,7 @@ const OrderConfirmationScreen: React.FC = () => {
 
   const handleTrackOrder = () => {
     // TODO: Navigate to order tracking screen
-    router.push(`/order-tracking/${currentOrder.id}`);
+    router.push(`/order-tracking/${orderId || currentOrder?.id}`);
   };
 
   const handleContinueShopping = () => {
@@ -81,6 +207,89 @@ const OrderConfirmationScreen: React.FC = () => {
     router.push('/(tabs)/profile');
   };
 
+  const handleRetryPayment = () => {
+    setPaymentStatus('pending');
+    handlePaymentProcessing();
+  };
+
+  const handleTestMockPayment = async () => {
+    console.log('🧪 Testing mock payment directly...');
+    setIsProcessingPayment(true);
+    setPaymentStatus('processing');
+    
+    try {
+      const mockResponse = await mockPayment({
+        key: 'test_key',
+        amount: 100,
+        currency: 'INR',
+        order_id: 'test_order_' + Date.now(),
+        name: 'Test Store',
+        description: 'Test payment',
+        prefill: {
+          name: 'Test User',
+          email: 'test@example.com',
+          contact: '9999999999',
+        },
+        notes: {
+          test: 'true',
+        },
+        theme: {
+          color: '#eb2424',
+        },
+      });
+      
+      console.log('🧪 Mock payment test successful:', mockResponse);
+      setPaymentStatus('success');
+      showPaymentSuccess('test_order');
+    } catch (error: any) {
+      console.error('🧪 Mock payment test failed:', error);
+      setPaymentStatus('failed');
+      showPaymentError(error);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Show payment processing state
+  if (isProcessingPayment || paymentStatus === 'processing') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.processingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.processingTitle}>Processing Payment...</Text>
+          <Text style={styles.processingSubtitle}>
+            Please wait while we process your payment securely
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Show payment failed state
+  if (paymentStatus === 'failed') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <IconSymbol name="close-circle" size={80} color="#FF5252" />
+          <Text style={styles.errorTitle}>Payment Failed</Text>
+          <Text style={styles.errorSubtitle}>
+            There was an issue processing your payment. Please try again.
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRetryPayment}>
+            <Text style={styles.retryButtonText}>Retry Payment</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.testButton} onPress={handleTestMockPayment}>
+            <Text style={styles.testButtonText}>Test Mock Payment</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Back to Checkout</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Show order confirmation (payment successful or pending)
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -91,32 +300,63 @@ const OrderConfirmationScreen: React.FC = () => {
             style={styles.successGradient}
           >
             <View style={styles.successIconContainer}>
-              <IconSymbol name="checkmark-circle" size={60} color="white" />
+              <IconSymbol name="checkmark" size={60} color="white" />
             </View>
-            <Text style={styles.successTitle}>Order Confirmed!</Text>
+            <Text style={styles.successTitle}>
+              {paymentStatus === 'success' ? 'Payment Successful!' : 'Order Confirmed!'}
+            </Text>
             <Text style={styles.successSubtitle}>
-              Thank you for your purchase. We'll send you updates on your order.
+              {paymentStatus === 'success' 
+                ? 'Your payment has been processed successfully. We\'ll send you updates on your order.'
+                : 'Thank you for your purchase. We\'ll send you updates on your order.'
+              }
             </Text>
           </LinearGradient>
         </View>
+
+        {/* Payment Details */}
+        {paymentStatus === 'success' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Details</Text>
+            <View style={styles.paymentCard}>
+              <View style={styles.paymentInfo}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Payment ID:</Text>
+                  <Text style={styles.infoValue}>{paymentOrderId}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Amount:</Text>
+                  <Text style={styles.infoValue}>₹{(parseInt(amount) / 100).toFixed(2)}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Status:</Text>
+                  <View style={styles.statusBadge}>
+                    <IconSymbol name="checkmark-circle" size={16} color="white" />
+                    <Text style={styles.statusText}>Paid</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Order Details */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Details</Text>
           <View style={styles.orderCard}>
             <View style={styles.orderHeader}>
-              <Text style={styles.orderId}>Order #{currentOrder.id}</Text>
+              <Text style={styles.orderId}>Order #{orderId || currentOrder?.id}</Text>
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: getStatusColor(currentOrder.status) }
+                { backgroundColor: getStatusColor(currentOrder?.status || 'pending') }
               ]}>
                 <IconSymbol 
-                  name={getStatusIcon(currentOrder.status)} 
+                  name={getStatusIcon(currentOrder?.status || 'pending')} 
                   size={16} 
                   color="white" 
                 />
                 <Text style={styles.statusText}>
-                  {currentOrder.status.charAt(0).toUpperCase() + currentOrder.status.slice(1)}
+                  {(currentOrder?.status || 'pending').charAt(0).toUpperCase() + (currentOrder?.status || 'pending').slice(1)}
                 </Text>
               </View>
             </View>
@@ -124,17 +364,17 @@ const OrderConfirmationScreen: React.FC = () => {
             <View style={styles.orderInfo}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Order Date:</Text>
-                <Text style={styles.infoValue}>{formatDate(currentOrder.orderDate)}</Text>
+                <Text style={styles.infoValue}>{formatDate(currentOrder?.orderDate || new Date().toISOString())}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Payment Method:</Text>
-                <Text style={styles.infoValue}>{currentOrder.paymentMethod}</Text>
+                <Text style={styles.infoValue}>{currentOrder?.paymentMethod || 'Razorpay'}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Total Amount:</Text>
-                <Text style={styles.infoValue}>${currentOrder.total.toFixed(2)}</Text>
+                <Text style={styles.infoValue}>₹{(parseInt(amount) / 100).toFixed(2)}</Text>
               </View>
-              {currentOrder.estimatedDelivery && (
+              {currentOrder?.estimatedDelivery && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Estimated Delivery:</Text>
                   <Text style={styles.infoValue}>{formatDate(currentOrder.estimatedDelivery)}</Text>
@@ -148,17 +388,22 @@ const OrderConfirmationScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Items Ordered</Text>
           <View style={styles.itemsCard}>
-            {currentOrder.items.map((item, index) => (
-              <View key={item.id} style={styles.orderItem}>
-                <Image source={{ uri: item.product.image }} style={styles.itemImage} />
+            {(currentOrder?.items || cartItems).map((item: any, index: number) => (
+              <View key={item.id || index} style={styles.orderItem}>
+                <Image 
+                  source={{ uri: item.product?.image || item.product?.images?.[0] }} 
+                  style={styles.itemImage} 
+                />
                 <View style={styles.itemDetails}>
-                  <Text style={styles.itemName}>{item.product.name}</Text>
+                  <Text style={styles.itemName}>{item.product?.name || 'Product'}</Text>
                   <Text style={styles.itemSpecs}>
                     Qty: {item.quantity}
                     {item.selectedSize && ` • Size: ${item.selectedSize}`}
                     {item.selectedColor && ` • Color: ${item.selectedColor}`}
                   </Text>
-                  <Text style={styles.itemPrice}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+                  <Text style={styles.itemPrice}>
+                    ₹{((item.product?.price || 0) * item.quantity).toFixed(2)}
+                  </Text>
                 </View>
               </View>
             ))}
@@ -166,19 +411,26 @@ const OrderConfirmationScreen: React.FC = () => {
         </View>
 
         {/* Shipping Address */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shipping Address</Text>
-          <View style={styles.addressCard}>
-            <IconSymbol name="location" size={20} color={theme.colors.primary} />
-            <View style={styles.addressDetails}>
-              <Text style={styles.addressText}>{currentOrder.shippingAddress.address}</Text>
-              <Text style={styles.addressText}>
-                {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state} {currentOrder.shippingAddress.zipCode}
-              </Text>
-              <Text style={styles.addressText}>{currentOrder.shippingAddress.country}</Text>
+        {currentOrder?.shippingAddress && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Shipping Address</Text>
+            <View style={styles.addressCard}>
+              <IconSymbol name="location" size={20} color={theme.colors.primary} />
+              <View style={styles.addressDetails}>
+                <Text style={styles.addressText}>{currentOrder.shippingAddress.fullName}</Text>
+                <Text style={styles.addressText}>{currentOrder.shippingAddress.address}</Text>
+                {currentOrder.shippingAddress.addressLine2 && (
+                  <Text style={styles.addressText}>{currentOrder.shippingAddress.addressLine2}</Text>
+                )}
+                <Text style={styles.addressText}>
+                  {currentOrder.shippingAddress.city}, {currentOrder.shippingAddress.state} {currentOrder.shippingAddress.zipCode}
+                </Text>
+                <Text style={styles.addressText}>{currentOrder.shippingAddress.country}</Text>
+                <Text style={styles.addressText}>{currentOrder.shippingAddress.phone}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Next Steps */}
         <View style={styles.section}>
@@ -257,6 +509,73 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  processingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+  },
+  processingTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.fonts.bold,
+  },
+  processingSubtitle: {
+    fontSize: 16,
+    color: theme.colors.subtitle,
+    textAlign: 'center',
+    fontFamily: theme.fonts.regular,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF5252',
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.fonts.bold,
+  },
+  errorSubtitle: {
+    fontSize: 16,
+    color: theme.colors.subtitle,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+    fontFamily: theme.fonts.regular,
+  },
+  retryButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: 12,
+    marginBottom: theme.spacing.md,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
+  },
+  testButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: 12,
+    marginBottom: theme.spacing.md,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
+  },
   successHeader: {
     marginBottom: theme.spacing.lg,
   },
@@ -293,6 +612,16 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.bold,
     marginBottom: theme.spacing.md,
   },
+  paymentCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: theme.spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   orderCard: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -322,12 +651,16 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
     borderRadius: 16,
     gap: 4,
+    backgroundColor: '#4CAF50',
   },
   statusText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
     fontFamily: theme.fonts.bold,
+  },
+  paymentInfo: {
+    gap: theme.spacing.sm,
   },
   orderInfo: {
     gap: theme.spacing.sm,
@@ -497,26 +830,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: theme.fonts.bold,
   },
-  errorText: {
-    fontSize: 18,
-    color: theme.colors.subtitle,
-    textAlign: 'center',
-    marginTop: 100,
-    fontFamily: theme.fonts.regular,
-  },
   backButton: {
-    marginTop: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.primary,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
     alignItems: 'center',
-    marginHorizontal: theme.spacing.lg,
   },
   backButtonText: {
-    color: 'white',
+    color: theme.colors.primary,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontFamily: theme.fonts.bold,
   },
 });

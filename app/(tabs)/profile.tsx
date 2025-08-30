@@ -16,17 +16,14 @@ const ProfileScreen: React.FC = () => {
   const { isAuthenticated, navigateToAuth } = useAuth();
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const { name, phone } = useSelector((state: RootState) => state.user);
+  const { name, phone, email } = useSelector((state: RootState) => state.user);
   const orders = useSelector(selectOrders);
 
   const handleLogout = () => {
     dispatch(logout());
   };
 
-  const handleViewOrders = () => {
-    // TODO: Navigate to orders screen
-    console.log('View orders');
-  };
+
 
   const handleViewOrderDetails = (orderId: string) => {
     router.push(`/order-tracking/${orderId}`);
@@ -133,7 +130,7 @@ const ProfileScreen: React.FC = () => {
               <View style={styles.infoRow}>
                 <IconSymbol name="mail" size={20} color={theme.colors.subtitle} />
                 <Text style={styles.infoLabel}>Email:</Text>
-                <Text style={styles.infoValue}>user@fashionsaga.com</Text>
+                <Text style={styles.infoValue}>{email || 'user@fashionsaga.com'}</Text>
               </View>
               <View style={styles.infoRow}>
                 <IconSymbol name="phone" size={20} color={theme.colors.subtitle} />
@@ -143,17 +140,26 @@ const ProfileScreen: React.FC = () => {
             </View>
 
             <View style={styles.actionsSection}>
-              <TouchableOpacity style={styles.actionButton}>
-                <IconSymbol name="settings" size={20} color={theme.colors.primary} />
-                <Text style={styles.actionButtonText}>Settings</Text>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push('/profile-edit')}
+              >
+                <IconSymbol name="person" size={20} color={theme.colors.primary} />
+                <Text style={styles.actionButtonText}>Edit Profile</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.actionButton}>
-                <IconSymbol name="heart" size={20} color={theme.colors.primary} />
-                <Text style={styles.actionButtonText}>Favorites</Text>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push('/change-password')}
+              >
+                <IconSymbol name="lock" size={20} color={theme.colors.primary} />
+                <Text style={styles.actionButtonText}>Change Password</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.actionButton} onPress={handleViewOrders}>
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={() => router.push('/order-history')}
+              >
                 <IconSymbol name="cart" size={20} color={theme.colors.primary} />
                 <Text style={styles.actionButtonText}>Order History</Text>
               </TouchableOpacity>

@@ -36,22 +36,42 @@ const headerPaddingBottom = isSmallScreen ? 16 : 20;
 
 const ExploreScreen: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { exploreData, loading } = useSelector((state: RootState) => state.products);
+  const { exploreData, loading, error } = useSelector((state: RootState) => state.products);
   const { isAuthenticated, navigateToAuth } = useAuth();
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
   useEffect(() => {
+    console.log('Explore screen mounted, dispatching fetchExploreData');
     dispatch(fetchExploreData());
   }, [dispatch]);
 
+  useEffect(() => {
+    console.log('Explore data state changed:', { 
+      loading, 
+      hasData: !!exploreData, 
+      error,
+      categoriesCount: exploreData?.categories?.length || 0,
+      featuredCount: exploreData?.featuredProducts?.length || 0,
+      trendingCount: exploreData?.trendingProducts?.length || 0,
+      newArrivalsCount: exploreData?.newArrivals?.length || 0,
+      saleCount: exploreData?.saleProducts?.length || 0,
+    });
+    
+    if (exploreData?.categories) {
+      console.log('📋 Available categories:', exploreData.categories.map(cat => ({ id: cat.id, name: cat.name })));
+    }
+  }, [exploreData, loading, error]);
+
   const handleRefresh = () => {
+    console.log('Refreshing explore data');
     dispatch(fetchExploreData());
   };
 
 
 
   const handleCategoryPress = (categoryId: string) => {
+    console.log('🎯 Category pressed:', { categoryId, type: typeof categoryId });
     router.push(`/category/${categoryId}` as any);
   };
 
@@ -105,6 +125,12 @@ const ExploreScreen: React.FC = () => {
       <View style={styles.errorContainer}>
         <IconSymbol name="error" size={48} color={theme.colors.subtitle} />
         <Text style={styles.errorText}>Failed to load explore data</Text>
+        {error && (
+          <Text style={styles.errorDetails}>{error}</Text>
+        )}
+        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -175,11 +201,11 @@ const ExploreScreen: React.FC = () => {
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
             {[
-              { id: 'all', label: 'All', icon: 'grid' },
-              { id: 'featured', label: 'Featured', icon: 'star' },
-              { id: 'trending', label: 'Trending', icon: 'trending-up' },
-              { id: 'new', label: 'New', icon: 'newspaper' },
-              { id: 'sale', label: 'Sale', icon: 'pricetag' },
+              { id: 'all', label: 'All', icon: 'grid' as const },
+              { id: 'featured', label: 'Featured', icon: 'star' as const },
+              { id: 'trending', label: 'Trending', icon: 'trending-up' as const },
+              { id: 'new', label: 'New', icon: 'gift' as const },
+              { id: 'sale', label: 'Sale', icon: 'pricetag' as const },
             ].map((filter) => (
               <TouchableOpacity
                 key={filter.id}
@@ -282,6 +308,26 @@ const styles = StyleSheet.create({
     color: theme.colors.subtitle,
     fontFamily: theme.fonts.regular,
     marginTop: theme.spacing.md,
+  },
+  errorDetails: {
+    fontSize: theme.fontSizes.subtitle,
+    color: theme.colors.subtitle,
+    fontFamily: theme.fonts.regular,
+    marginTop: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: theme.spacing.lg,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: '600',
+    fontFamily: theme.fonts.bold,
   },
   headerContainer: {
     position: 'absolute',

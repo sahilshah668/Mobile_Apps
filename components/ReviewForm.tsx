@@ -59,12 +59,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       return;
     }
 
-    if (comment.trim().length < 10) {
-      Alert.alert('Review Too Short', 'Please write at least 10 characters in your review.');
-      return;
-    }
-
     try {
+      console.log('Submitting review:', { productId, rating, comment: comment.trim() });
       await dispatch(submitReview({
         productId,
         rating,
@@ -89,7 +85,24 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         ]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit review. Please try again.');
+      console.error('Review submission error in form:', error);
+      
+      // Categorize errors for better user feedback
+      let errorMessage = 'Failed to submit review. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          errorMessage = 'Session expired. Please log in again.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (error.message.includes('400') || error.message.includes('Bad Request')) {
+          errorMessage = 'Invalid review data. Please check your rating and try again.';
+        }
+      }
+      
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -167,15 +180,15 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           <Text style={styles.headerTitle}>Write a Review</Text>
           <TouchableOpacity
             onPress={handleSubmit}
-            disabled={submitting || rating === 0 || comment.trim().length < 10}
+            disabled={submitting || rating === 0}
             style={[
               styles.submitButton,
-              (submitting || rating === 0 || comment.trim().length < 10) && styles.submitButtonDisabled
+              (submitting || rating === 0) && styles.submitButtonDisabled
             ]}
           >
             <Text style={[
               styles.submitText,
-              (submitting || rating === 0 || comment.trim().length < 10) && styles.submitTextDisabled
+              (submitting || rating === 0) && styles.submitTextDisabled
             ]}>
               {submitting ? 'Submitting...' : 'Submit'}
             </Text>
@@ -196,10 +209,10 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           </View>
 
           <View style={styles.commentSection}>
-            <Text style={styles.sectionTitle}>Your Review</Text>
+            <Text style={styles.sectionTitle}>Your Review (Optional)</Text>
             <TextInput
               style={styles.commentInput}
-              placeholder="Share your experience with this product..."
+              placeholder="Share your experience with this product... (optional)"
               placeholderTextColor={theme.colors.subtitle}
               value={comment}
               onChangeText={setComment}
@@ -219,7 +232,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               • Be honest and specific about your experience{'\n'}
               • Focus on the product quality and features{'\n'}
               • Avoid personal information or inappropriate content{'\n'}
-              • Minimum 10 characters required
+              • Rating is required, review text is optional
             </Text>
           </View>
         </ScrollView>

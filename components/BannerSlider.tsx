@@ -12,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useAppDispatch } from '@/hooks/useAppDispatch';
+import { trackBannerClickThunk } from '@/store/productSlice';
 
 const { width } = Dimensions.get('window');
 
@@ -26,8 +28,23 @@ const BannerSlider: React.FC<BannerSliderProps> = ({
   onBannerPress,
   autoScrollInterval = 4000,
 }) => {
+  const dispatch = useAppDispatch();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleBannerPress = async (bannerId: string) => {
+    try {
+      // Track banner click for analytics
+      await dispatch(trackBannerClickThunk(bannerId));
+    } catch (error) {
+      console.error('Failed to track banner click:', error);
+    }
+    
+    // Call the original onBannerPress handler
+    if (onBannerPress) {
+      onBannerPress(bannerId);
+    }
+  };
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -75,7 +92,7 @@ const BannerSlider: React.FC<BannerSliderProps> = ({
           <TouchableOpacity
             key={banner.id}
             style={styles.bannerContainer}
-            onPress={() => onBannerPress?.(banner.id)}
+            onPress={() => handleBannerPress(banner.id)}
             activeOpacity={0.9}
           >
             <Image source={{ uri: banner.image }} style={styles.bannerImage} />

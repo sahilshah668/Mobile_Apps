@@ -18,7 +18,11 @@
         "backgroundColor": "#156BFF"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.storesa2z.fashionsaga"
+      "package": "com.storesa2z.fashionsaga",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -36,7 +40,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-edge-to-edge"
     ],
     "experiments": {
       "typedRoutes": true

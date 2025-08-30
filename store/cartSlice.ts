@@ -66,18 +66,37 @@ export const fetchServerCart = createAsyncThunk('cart/fetchServerCart', async (_
 
 export const addServerCartItem = createAsyncThunk('cart/addServerCartItem', async (payload: { productId: string; qty?: number }, { rejectWithValue }) => {
   try {
-    const res = await apiFetch('/api/public/cart', { method: 'POST', body: JSON.stringify(payload) }, false);
-    return json<any>(res);
+    console.log('Adding item to server cart:', payload);
+          const res = await apiFetch('/api/public/cart/add', { 
+        method: 'POST', 
+        body: JSON.stringify({
+          product: payload.productId,
+          quantity: payload.qty || 1
+        }) 
+      }, false);
+    const result = await json<any>(res);
+    console.log('Server cart add response:', result);
+    return result;
   } catch (e: any) {
+    console.error('Failed to add to server cart:', e);
     return rejectWithValue(e.message || 'Failed to add to cart');
   }
 });
 
 export const removeServerCartItem = createAsyncThunk('cart/removeServerCartItem', async (payload: { productId: string }, { rejectWithValue }) => {
   try {
-    const res = await apiFetch('/api/public/cart', { method: 'DELETE', body: JSON.stringify(payload) }, false);
-    return json<any>(res);
+    console.log('Removing item from server cart:', payload);
+          const res = await apiFetch('/api/public/cart/remove', { 
+        method: 'POST', 
+        body: JSON.stringify({
+          product: payload.productId
+        }) 
+      }, false);
+    const result = await json<any>(res);
+    console.log('Server cart remove response:', result);
+    return result;
   } catch (e: any) {
+    console.error('Failed to remove from server cart:', e);
     return rejectWithValue(e.message || 'Failed to remove from cart');
   }
 });
@@ -282,12 +301,118 @@ const cartSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Load local cart
       .addCase(loadLocalCart.fulfilled, (state, action) => {
         // Handle loading local cart
       })
       .addCase(migrateLocalCartToServer.fulfilled, (state, action) => {
         // Handle migration - items will be added to server cart
         state.items = [];
+      })
+      
+      // Server cart operations
+      .addCase(fetchServerCart.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchServerCart.fulfilled, (state, action) => {
+        state.loading = false;
+        // Map server cart response to local state
+        if (action.payload?.data?.items) {
+          state.items = action.payload.data.items.map((item: any) => ({
+            id: item._id || item.id,
+            product: item.product || {},
+            quantity: item.quantity || 1,
+            selectedColor: item.selectedColor,
+            selectedSize: item.selectedSize,
+          }));
+        } else if (action.payload?.data?.items === undefined && action.payload?.data) {
+          // Handle case where response is the cart object directly
+          const cartData = action.payload.data;
+          if (cartData.items && Array.isArray(cartData.items)) {
+            state.items = cartData.items.map((item: any) => ({
+              id: item._id || item.id,
+              product: item.product || {},
+              quantity: item.quantity || 1,
+              selectedColor: item.selectedColor,
+              selectedSize: item.selectedSize,
+            }));
+          }
+        }
+      })
+      .addCase(fetchServerCart.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string || 'Failed to load cart';
+      })
+      
+      // Add to server cart
+      .addCase(addServerCartItem.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addServerCartItem.fulfilled, (state, action) => {
+        state.loading = false;
+        // Refresh cart data after adding item
+        if (action.payload?.data?.items) {
+          state.items = action.payload.data.items.map((item: any) => ({
+            id: item._id || item.id,
+            product: item.product || {},
+            quantity: item.quantity || 1,
+            selectedColor: item.selectedColor,
+            selectedSize: item.selectedSize,
+          }));
+        } else if (action.payload?.data?.items === undefined && action.payload?.data) {
+          // Handle case where response is the cart object directly
+          const cartData = action.payload.data;
+          if (cartData.items && Array.isArray(cartData.items)) {
+            state.items = cartData.items.map((item: any) => ({
+              id: item._id || item.id,
+              product: item.product || {},
+              quantity: item.quantity || 1,
+              selectedColor: item.selectedColor,
+              selectedSize: item.selectedSize,
+            }));
+          }
+        }
+      })
+      .addCase(addServerCartItem.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string || 'Failed to add to cart';
+      })
+      
+      // Remove from server cart
+      .addCase(removeServerCartItem.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(removeServerCartItem.fulfilled, (state, action) => {
+        state.loading = false;
+        // Refresh cart data after removing item
+        if (action.payload?.data?.items) {
+          state.items = action.payload.data.items.map((item: any) => ({
+            id: item._id || item.id,
+            product: item.product || {},
+            quantity: item.quantity || 1,
+            selectedColor: item.selectedColor,
+            selectedSize: item.selectedSize,
+          }));
+        } else if (action.payload?.data?.items === undefined && action.payload?.data) {
+          // Handle case where response is the cart object directly
+          const cartData = action.payload.data;
+          if (cartData.items && Array.isArray(cartData.items)) {
+            state.items = cartData.items.map((item: any) => ({
+              id: item._id || item.id,
+              product: item.product || {},
+              quantity: item.quantity || 1,
+              selectedColor: item.selectedColor,
+              selectedSize: item.selectedSize,
+            }));
+          }
+        }
+      })
+      .addCase(removeServerCartItem.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string || 'Failed to remove from cart';
       });
   },
 });

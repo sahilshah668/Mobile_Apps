@@ -74,11 +74,13 @@ const defaults: Theme = {
 
 // Merge runtime theme colors if provided by builder
 const runtimeColors = (APP_CONFIG?.theme as any)?.colors || {};
+const storeBrandingColors = (APP_CONFIG?.store?.branding as any)?.colors || {};
 const theme: Theme = {
   ...defaults,
   colors: {
     ...defaults.colors,
     ...runtimeColors,
+    ...storeBrandingColors, // Store branding colors take precedence
   },
 };
 

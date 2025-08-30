@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { apiFetch, json } from '../services/api';
 
 export interface Review {
   id: string;
@@ -38,75 +39,85 @@ const initialState: ReviewState = {
 // Async thunks
 export const fetchProductReviews = createAsyncThunk(
   'review/fetchProductReviews',
-  async (productId: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock data - in real app, this would be an API call
-    const mockReviews: Review[] = [
-      {
-        id: '1',
-        productId,
-        userId: 'user1',
-        userName: 'Sarah Johnson',
-        userAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=50&h=50&fit=crop',
-        rating: 5,
-        comment: 'Absolutely love this bag! The quality is exceptional and it goes with everything. Highly recommend!',
-        date: '2024-01-15',
-        helpful: 12,
-        verified: true,
-      },
-      {
-        id: '2',
-        productId,
-        userId: 'user2',
-        userName: 'Michael Chen',
-        userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop',
-        rating: 4,
-        comment: 'Great quality leather and perfect size. The only minor issue is the strap could be a bit longer.',
-        date: '2024-01-10',
-        helpful: 8,
-        verified: true,
-      },
-      {
-        id: '3',
-        productId,
-        userId: 'user3',
-        userName: 'Emma Davis',
-        userAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop',
-        rating: 5,
-        comment: 'This bag exceeded my expectations. The craftsmanship is amazing and it looks even better in person.',
-        date: '2024-01-05',
-        helpful: 15,
-        verified: true,
-      },
-    ];
-    
-    return mockReviews;
+  async (productId: string, { rejectWithValue }) => {
+    try {
+      const response = await apiFetch(`/public/reviews/${productId}`, {}, true);
+      const result = await json(response);
+      
+      // Map backend response to frontend format
+      const reviews = (result.data || result || []).map((review: any) => ({
+        id: review._id || review.id,
+        productId: review.productId || productId,
+        userId: review.userId,
+        userName: review.userName || review.user?.name || 'Anonymous',
+        userAvatar: review.userAvatar || review.user?.avatar || '',
+        rating: review.rating,
+        comment: review.comment || review.review,
+        date: review.createdAt || review.date,
+        helpful: review.helpful || 0,
+        verified: review.verified || false,
+      }));
+      
+      return reviews;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch reviews');
+    }
   }
 );
 
 export const submitReview = createAsyncThunk(
   'review/submitReview',
-  async (reviewData: ReviewForm) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock response - in real app, this would be an API call
-    const newReview: Review = {
-      id: Date.now().toString(),
-      productId: reviewData.productId,
-      userId: 'current-user',
-      userName: 'Current User',
-      userAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop',
-      rating: reviewData.rating,
-      comment: reviewData.comment,
-      date: new Date().toISOString().split('T')[0],
-      helpful: 0,
-      verified: false,
-    };
-    
-    return newReview;
+  async (reviewData: ReviewForm, { rejectWithValue }) => {
+    let retryCount = 0;
+    const maxRetries = 2;
+
+    while (retryCount <= maxRetries) {
+      try {
+        console.log(`Review submission attempt ${retryCount + 1}/${maxRetries + 1}`);
+        console.log('Submitting review with data:', reviewData);
+        
+        const response = await apiFetch('api/public/reviews', {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: reviewData.productId,
+            rating: reviewData.rating,
+            comment: reviewData.comment,
+          }),
+        }, false); // false for authenticated request
+        
+        const result = await json(response);
+        console.log('Review submission successful:', result);
+        
+        // Map backend response to frontend format
+        const newReview: Review = {
+          id: result.data._id || result.data.id,
+          productId: result.data.productId || reviewData.productId,
+          userId: result.data.userId,
+          userName: result.data.userName || result.data.user?.name || 'Current User',
+          userAvatar: result.data.userAvatar || result.data.user?.avatar || '',
+          rating: result.data.rating,
+          comment: result.data.comment,
+          date: result.data.createdAt || new Date().toISOString().split('T')[0],
+          helpful: result.data.helpful || 0,
+          verified: result.data.verified || false,
+        };
+        
+        return newReview;
+      } catch (error) {
+        console.error(`Review submission attempt ${retryCount + 1} failed:`, error);
+        
+        if (retryCount === maxRetries) {
+          console.error('All review submission attempts failed');
+          return rejectWithValue(error instanceof Error ? error.message : 'Failed to submit review');
+        }
+        
+        // Wait before retry with exponential backoff
+        const delay = 1000 * Math.pow(2, retryCount); // 1s, 2s, 4s
+        console.log(`Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        retryCount++;
+      }
+    }
   }
 );
 

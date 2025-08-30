@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,9 +20,9 @@ import {
   clearCart,
   selectCartItems,
   selectCartTotal,
-  selectShippingAddress
 } from '@/store/cartSlice';
-import { createOrder } from '@/store/orderSlice';
+import { createMobilePaymentOrder } from '@/store/orderSlice';
+import { selectDefaultAddress, selectAddresses } from '@/store/addressSlice';
 
 const CheckoutScreen: React.FC = () => {
   const router = useRouter();
@@ -30,14 +30,16 @@ const CheckoutScreen: React.FC = () => {
   const { requireAuth } = useAuth();
   
   // Use static theme
-  const hasPaymentIntegration = false; // Static feature flag
+  const hasPaymentIntegration = true; // Enable payment integration
   
   const cartItems = useSelector(selectCartItems);
   const cartTotal = useSelector(selectCartTotal);
-  const shippingAddress = useSelector(selectShippingAddress);
+  const defaultAddress = useSelector(selectDefaultAddress);
+  const addresses = useSelector(selectAddresses);
   
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('razorpay');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState(defaultAddress);
 
   const paymentMethods = [
     {
@@ -64,6 +66,13 @@ const CheckoutScreen: React.FC = () => {
   const tax = cartTotal * 0.18; // 18% tax
   const finalTotal = cartTotal + shippingCost + tax;
 
+  // Update selected address when default address changes
+  useEffect(() => {
+    if (defaultAddress && !selectedAddress) {
+      setSelectedAddress(defaultAddress);
+    }
+  }, [defaultAddress, selectedAddress]);
+
   const handlePaymentMethodSelect = (methodId: string) => {
     setSelectedPaymentMethod(methodId);
   };
@@ -71,7 +80,7 @@ const CheckoutScreen: React.FC = () => {
   const handlePlaceOrder = async () => {
     if (!requireAuth('place order')) return;
 
-    if (!shippingAddress) {
+    if (!selectedAddress) {
       Alert.alert('Error', 'Please add a shipping address');
       return;
     }
@@ -84,32 +93,70 @@ const CheckoutScreen: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Create order
-      dispatch(createOrder({
-        items: cartItems,
-        total: finalTotal,
-        shippingAddress,
+      // Create mobile payment order
+      const result = await dispatch(createMobilePaymentOrder({
+        cart: cartItems,
+        shippingAddress: {
+          fullName: selectedAddress.fullName,
+          address: selectedAddress.address,
+          addressLine2: selectedAddress.addressLine2,
+          city: selectedAddress.city,
+          state: selectedAddress.state,
+          zipCode: selectedAddress.zipCode,
+          country: selectedAddress.country,
+          phone: selectedAddress.phone,
+        },
         paymentMethod: selectedPaymentMethod,
-      }));
+        shippingCost,
+      })).unwrap();
 
-      // Clear cart
+      console.log('Payment order created successfully:', result);
+
+      // Clear cart after successful order creation
       dispatch(clearCart());
 
-      // Navigate to order confirmation
-      router.push('/order-confirmation');
-    } catch {
-      Alert.alert('Error', 'Payment failed. Please try again.');
+      // For COD orders, navigate directly to confirmation
+      if (selectedPaymentMethod === 'cod') {
+        router.push({
+          pathname: '/order-confirmation',
+          params: {
+            orderId: result.orderId,
+            paymentMethod: 'cod',
+            amount: (finalTotal * 100).toString(), // Convert to paise for consistency
+          }
+        });
+      } else {
+        // For online payments, navigate to payment processing
+        router.push({
+          pathname: '/order-confirmation',
+          params: {
+            orderId: result.orderId,
+            paymentOrderId: result.razorpayOrderId,
+            amount: result.amount,
+            key: result.key,
+          }
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      Alert.alert('Error', error.message || 'Payment failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleEditAddress = () => {
-    // TODO: Navigate to address editing screen
-    Alert.alert('Info', 'Address editing will be implemented');
+    router.push('/addresses');
+  };
+
+  const handleSelectAddress = () => {
+    if (addresses.length > 1) {
+      // Show address selection modal or navigate to address selection
+      Alert.alert('Select Address', 'Address selection will be implemented');
+    } else {
+      router.push('/addresses');
+    }
   };
 
   const renderOrderSummary = () => (
@@ -119,14 +166,14 @@ const CheckoutScreen: React.FC = () => {
         {cartItems.map((item) => (
           <View key={item.id} style={styles.orderItem}>
             <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.product.name}</Text>
+              <Text style={styles.itemName}>{item.product?.name || 'Product'}</Text>
               <Text style={styles.itemDetails}>
                 Qty: {item.quantity}
                 {item.selectedSize && ` • Size: ${item.selectedSize}`}
                 {item.selectedColor && ` • Color: ${item.selectedColor}`}
               </Text>
             </View>
-            <Text style={styles.itemPrice}>${(item.product.price * item.quantity).toFixed(2)}</Text>
+            <Text style={styles.itemPrice}>${((item.product?.price || 0) * item.quantity).toFixed(2)}</Text>
           </View>
         ))}
       </View>
@@ -163,13 +210,23 @@ const CheckoutScreen: React.FC = () => {
           <Text style={styles.editButton}>Edit</Text>
         </TouchableOpacity>
       </View>
-      {shippingAddress ? (
+      {selectedAddress ? (
         <View style={styles.addressCard}>
-          <Text style={styles.addressText}>{shippingAddress.address}</Text>
+          <Text style={styles.addressText}>{selectedAddress.fullName}</Text>
+          <Text style={styles.addressText}>{selectedAddress.address}</Text>
+          {selectedAddress.addressLine2 && (
+            <Text style={styles.addressText}>{selectedAddress.addressLine2}</Text>
+          )}
           <Text style={styles.addressText}>
-            {shippingAddress.city}, {shippingAddress.state} {shippingAddress.zipCode}
+            {selectedAddress.city}, {selectedAddress.state} {selectedAddress.zipCode}
           </Text>
-          <Text style={styles.addressText}>{shippingAddress.country}</Text>
+          <Text style={styles.addressText}>{selectedAddress.country}</Text>
+          <Text style={styles.addressText}>{selectedAddress.phone}</Text>
+          {addresses.length > 1 && (
+            <TouchableOpacity style={styles.selectAddressButton} onPress={handleSelectAddress}>
+              <Text style={styles.selectAddressText}>Select Different Address</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <TouchableOpacity style={styles.addAddressButton} onPress={handleEditAddress}>
@@ -237,7 +294,7 @@ const CheckoutScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.placeOrderButton, isProcessing && styles.placeOrderButtonDisabled]}
           onPress={handlePlaceOrder}
-          disabled={isProcessing || cartItems.length === 0}
+          disabled={isProcessing || cartItems.length === 0 || !selectedAddress}
         >
           <LinearGradient
             colors={[theme.colors.primary, theme.colors.primary]}
@@ -406,6 +463,19 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.sm,
     fontSize: 16,
     color: theme.colors.primary,
+    fontFamily: theme.fonts.bold,
+  },
+  selectAddressButton: {
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  selectAddressText: {
+    color: 'white',
+    fontSize: 14,
     fontFamily: theme.fonts.bold,
   },
   paymentMethodCard: {

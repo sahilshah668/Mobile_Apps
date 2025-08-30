@@ -2,6 +2,8 @@ import theme from '@/constants/theme';
 import { Banner as BannerType } from '@/store/productSlice';
 import React from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAppDispatch } from '@/hooks/useAppDispatch';
+import { trackBannerClickThunk } from '@/store/productSlice';
 
 const { width, height } = Dimensions.get('window');
 
@@ -11,10 +13,26 @@ interface BannerProps {
 }
 
 const Banner: React.FC<BannerProps> = ({ banner, onPress }) => {
+  const dispatch = useAppDispatch();
+
+  const handlePress = async () => {
+    try {
+      // Track banner click for analytics
+      await dispatch(trackBannerClickThunk(banner.id));
+    } catch (error) {
+      console.error('Failed to track banner click:', error);
+    }
+    
+    // Call the original onPress handler
+    if (onPress) {
+      onPress();
+    }
+  };
+
   return (
     <TouchableOpacity
       style={[styles.container, { backgroundColor: banner.backgroundColor }]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.9}
     >
       <View style={styles.content}>

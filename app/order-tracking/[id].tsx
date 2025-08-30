@@ -265,6 +265,24 @@ const OrderTrackingScreen: React.FC = () => {
             </View>
           </View>
         </View>
+
+        {/* Return/Refund Button for eligible orders */}
+        {(order.status === 'delivered' || order.status === 'shipped') && (
+          <View style={styles.actionContainer}>
+            <TouchableOpacity 
+              style={styles.returnButton}
+              onPress={() => router.push(`/return-refund-request?orderId=${order.id}`)}
+            >
+              <LinearGradient
+                colors={['#FF9800', '#F57C00']}
+                style={styles.returnButtonGradient}
+              >
+                <IconSymbol name="arrow-back-circle" size={20} color="white" />
+                <Text style={styles.returnButtonText}>Request Return/Refund</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Support Button */}
@@ -547,6 +565,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: theme.colors.subtitle,
     fontFamily: theme.fonts.regular,
+  },
+  actionContainer: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+  },
+  returnButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  returnButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  returnButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: theme.fonts.bold,
   },
 });
 

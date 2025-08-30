@@ -2,80 +2,91 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { Linking } from 'expo-linking';
 import 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Provider, useSelector } from 'react-redux';
 import { RootState, store } from '../store/store';
-
-// Import our new services
-import analytics from '../src/services/analytics';
-import notifications from '../src/services/notifications';
-import deepLinking from '../src/services/deepLinking';
-import { loadCustomFonts } from '../src/utils/fontLoader';
-import APP_CONFIG from '../src/config/appConfig';
+import { getAccessToken } from '../services/token';
+import { APP_CONFIG } from '../config/appConfig';
+import { useDispatch } from 'react-redux';
+import { clearUser } from '../store/userSlice';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Inner component that can use Redux hooks
 function AppNavigator() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated } = useSelector((state: RootState) => state.user);
+  const { isAuthenticated, loading } = useSelector((state: RootState) => state.user);
+  const dispatch = useDispatch();
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Initialize services when app starts
+  // Initialize authentication state
   useEffect(() => {
-    const initializeServices = async () => {
+    const initializeAuth = async () => {
       try {
-        // Initialize analytics
-        await analytics.initialize();
+        console.log('🔍 Starting app initialization...');
+        console.log('🔍 APP_CONFIG available:', !!APP_CONFIG);
+        console.log('🔍 Store ID:', APP_CONFIG?.store?.id);
         
-        // Initialize notifications
-        await notifications.initialize();
+        const token = await getAccessToken();
+        console.log('🔍 Token found:', !!token);
+        console.log('🔍 Token length:', token ? token.length : 0);
         
-        // Initialize deep linking
-        await deepLinking.initialize();
+        if (token) {
+          // Token exists, try to validate it
+          try {
+            // You can add token validation here if needed
+            console.log('🔍 Token validation successful');
+          } catch (error) {
+            console.log('🔍 Token validation failed, clearing token');
+            console.error('🔍 Token validation error:', error);
+            // Token is invalid, clear it
+            // dispatch(clearUser());
+          }
+        } else {
+          console.log('🔍 No token found, user needs to login');
+        }
         
-        console.log('All services initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize services:', error);
+        console.log('🔍 Initialization completed successfully');
+              } catch (error: any) {
+          console.error('🔍 Auth initialization error:', error);
+          console.error('🔍 Error details:', {
+            message: error?.message || 'Unknown error',
+            stack: error?.stack || 'No stack trace',
+            name: error?.name || 'Unknown error type'
+          });
+      } finally {
+        console.log('🔍 Setting initialization complete');
+        setIsInitializing(false);
       }
     };
 
-    initializeServices();
-  }, []);
+    initializeAuth();
+  }, [dispatch]);
 
-  // Handle deep links
-  useEffect(() => {
-    const handleDeepLink = (url: string) => {
-      console.log('Received deep link:', url);
-      deepLinking.handleDeepLink(url);
-    };
-
-    // Handle initial URL
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink(url);
-      }
-    });
-
-    // Handle URL changes
-    const subscription = Linking.addEventListener('url', (event) => {
-      handleDeepLink(event.url);
-    });
-
-    return () => {
-      subscription?.remove();
-    };
-  }, []);
-
-  // Track screen views for analytics
-  useEffect(() => {
-    if (isAuthenticated) {
-      analytics.trackScreenView('Main App');
-    } else {
-      analytics.trackScreenView('Auth');
-    }
-  }, [isAuthenticated]);
+  // Show loading screen while initializing
+  if (isInitializing || loading) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: '#ffffff'
+      }}>
+        <ActivityIndicator size="large" color="#156BFF" />
+        <Text style={{ 
+          marginTop: 16, 
+          fontSize: 16, 
+          color: '#666',
+          textAlign: 'center'
+        }}>
+          Loading...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -152,9 +163,80 @@ function AppNavigator() {
                 presentation: 'modal',
               }} 
             />
-            {/* Legal pages */}
             <Stack.Screen 
-              name="legal" 
+              name="order-confirmation" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
+              name="order-tracking" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
+              name="checkout" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
+              name="addresses" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
+              name="profile-edit" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
+              name="change-password" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+            <Stack.Screen 
+              name="order-history" 
+              options={{ 
+                headerShown: false,
+                header: () => null,
+                presentation: 'modal',
+              }} 
+            />
+                    <Stack.Screen 
+          name="return-refund-request" 
+          options={{ 
+            headerShown: false,
+            header: () => null,
+            presentation: 'modal',
+          }} 
+        />
+        <Stack.Screen 
+          name="cancel-order" 
+          options={{ 
+            headerShown: false,
+            header: () => null,
+            presentation: 'modal',
+          }} 
+        />
+            <Stack.Screen 
+              name="order-details" 
               options={{ 
                 headerShown: false,
                 header: () => null,
@@ -178,38 +260,19 @@ function AppNavigator() {
 }
 
 export default function RootLayout() {
-  // Load custom fonts from APP_CONFIG
-  const [customFontsLoaded] = useFonts({
+  const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    // Add custom fonts from APP_CONFIG here when they're properly downloaded
-    // The builder will inject the actual font loading here
   });
 
-  // Load system fonts
-  const [systemFontsLoaded] = useFonts({
-    // System fonts are loaded automatically
-  });
-
-  // Initialize custom font loading
-  useEffect(() => {
-    const loadFonts = async () => {
-      try {
-        await loadCustomFonts();
-      } catch (error) {
-        console.error('Failed to load custom fonts:', error);
-      }
-    };
-
-    loadFonts();
-  }, []);
-
-  if (!customFontsLoaded || !systemFontsLoaded) {
+  if (!loaded) {
     return null;
   }
 
   return (
-    <Provider store={store}>
-      <AppNavigator />
-    </Provider>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <AppNavigator />
+      </Provider>
+    </ErrorBoundary>
   );
 }

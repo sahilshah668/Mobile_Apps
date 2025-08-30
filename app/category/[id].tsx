@@ -29,7 +29,7 @@ const CategoryDetailScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const { isAuthenticated, navigateToAuth } = useAuth();
-  const { exploreData, loading } = useSelector((state: RootState) => state.products);
+  const { exploreData, loading, categoryDetails } = useSelector((state: RootState) => state.products);
   
   // Use static theme and features
   const hasReviews = true;
@@ -41,26 +41,17 @@ const CategoryDetailScreen: React.FC = () => {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Mock category data - in real app this would come from API
-  const category = exploreData?.categories.find(cat => cat.id === id) || {
+  // Use real category data from API or fallback to explore data
+  const category = categoryDetails?.category || exploreData?.categories.find(cat => cat.id === id) || {
     id: id || '1',
-    name: 'Clothing',
+    name: 'Loading...',
     image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&h=200&fit=crop',
-    productCount: 109,
-    description: 'Trendy fashion for every occasion',
+    productCount: 0,
+    description: 'Loading category...',
   };
 
-  // Mock products for this category
-  const categoryProducts = [
-    { id: '1', name: 'Classic Denim Jacket', price: 65, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Fashion Co', rating: 4.6, reviews: 89, inStock: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '2', name: 'Elegant Evening Dress', price: 120, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Elegance', rating: 4.9, reviews: 156, inStock: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '3', name: 'Casual Summer Dress', price: 45, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Summer Style', rating: 4.4, reviews: 67, inStock: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '4', name: 'Bohemian Maxi Dress', price: 68, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Bohemian', rating: 4.3, reviews: 23, inStock: true, isNew: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '5', name: 'Cozy Winter Sweater', price: 35, originalPrice: 70, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Cozy', rating: 4.4, reviews: 156, inStock: true, isSale: true, discount: 50, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '6', name: 'Red Dress', price: 65, image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Elegance', rating: 4.7, reviews: 89, inStock: true, isHot: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '7', name: 'Pink Top', price: 28, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Fashion Co', rating: 4.5, reviews: 67, inStock: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-    { id: '8', name: 'Black Hat', price: 25, image: 'https://images.unsplash.com/photo-1521369909029-2afed882baee?w=200&h=200&fit=crop', category: 'Clothing', brand: 'Accessories', rating: 4.2, reviews: 45, inStock: true, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-  ];
+  // Use real products from API
+  const categoryProducts = categoryDetails?.products || [];
 
   useEffect(() => {
     if (id) {
@@ -135,7 +126,7 @@ const CategoryDetailScreen: React.FC = () => {
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>{category.name}</Text>
-              <Text style={styles.itemCount}>{category.productCount || 0} items</Text>
+              <Text style={styles.itemCount}>{categoryDetails?.pagination?.total || category.productCount || 0} items</Text>
             </View>
             {!isAuthenticated && (
               <TouchableOpacity style={styles.signInButton} onPress={navigateToAuth}>
@@ -157,7 +148,7 @@ const CategoryDetailScreen: React.FC = () => {
     <View style={styles.toolbar}>
       <View style={styles.toolbarLeft}>
         <Text style={styles.resultsText}>
-          {sortedProducts.length} products
+          {categoryDetails?.pagination?.total || sortedProducts.length} products
         </Text>
       </View>
       <View style={styles.toolbarRight}>
@@ -227,38 +218,53 @@ const CategoryDetailScreen: React.FC = () => {
         {renderToolbar()}
         {renderSortMenu()}
         
-        <FlatList
-          data={sortedProducts}
-          key={viewMode} // Add key prop to force re-render when viewMode changes
-          renderItem={({ item, index }) => (
-            <View 
-              style={[
-                viewMode === 'grid' ? styles.productWrapper : styles.productWrapperList,
-                { animationDelay: index * 50 }
-              ]}
-            >
-              <ProductCard
-                product={item}
-                onPress={() => handleProductPress(item.id)}
-                showAddToCart={true}
-                size={viewMode === 'list' ? 'large' : 'medium'}
+        {loading && categoryProducts.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <IconSymbol name="search" size={40} color={theme.colors.primary} />
+            <Text style={styles.loadingText}>Loading products...</Text>
+          </View>
+        ) : categoryProducts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <IconSymbol name="search" size={48} color={theme.colors.subtitle} />
+            <Text style={styles.emptyText}>No products found in this category</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => dispatch(fetchCategoryDetails(id))}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={sortedProducts}
+            key={viewMode} // Add key prop to force re-render when viewMode changes
+            renderItem={({ item, index }) => (
+              <View 
+                style={[
+                  viewMode === 'grid' ? styles.productWrapper : styles.productWrapperList,
+                  { animationDelay: index * 50 }
+                ]}
+              >
+                <ProductCard
+                  product={item}
+                  onPress={() => handleProductPress(item.id)}
+                  showAddToCart={true}
+                  size={viewMode === 'list' ? 'large' : 'medium'}
+                />
+              </View>
+            )}
+            keyExtractor={(item) => item.id}
+            numColumns={viewMode === 'grid' ? 2 : 1}
+            columnWrapperStyle={viewMode === 'grid' ? styles.productRow : undefined}
+            contentContainerStyle={styles.productsList}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl 
+                refreshing={loading} 
+                onRefresh={() => dispatch(fetchCategoryDetails(id))}
+                tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
               />
-            </View>
-          )}
-          keyExtractor={(item) => item.id}
-          numColumns={viewMode === 'grid' ? 2 : 1}
-          columnWrapperStyle={viewMode === 'grid' ? styles.productRow : undefined}
-          contentContainerStyle={styles.productsList}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl 
-              refreshing={loading} 
-              onRefresh={() => {}}
-              tintColor={theme.colors.primary}
-              colors={[theme.colors.primary]}
-            />
-          }
-        />
+            }
+          />
+        )}
       </View>
     </View>
   );
@@ -435,6 +441,44 @@ const styles = StyleSheet.create({
   productWrapperList: {
     width: '100%',
     marginBottom: theme.spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+  loadingText: {
+    fontSize: theme.fontSizes.subtitle,
+    color: theme.colors.subtitle,
+    fontFamily: theme.fonts.regular,
+    marginTop: theme.spacing.md,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xl,
+  },
+  emptyText: {
+    fontSize: theme.fontSizes.subtitle,
+    color: theme.colors.subtitle,
+    fontFamily: theme.fonts.regular,
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: theme.spacing.lg,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: '600',
+    fontFamily: theme.fonts.bold,
   },
 });
 

@@ -32,12 +32,29 @@ export async function clearTokens() {
 }
 
 export function isJwtExpired(token?: string | null): boolean {
-  if (!token) return true;
+  if (!token) {
+    console.log('Token validation: No token provided');
+    return true;
+  }
+  
   try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    // Use atob for React Native instead of Buffer
+    const base64 = token.split('.')[1];
+    const payload = JSON.parse(atob(base64));
     const exp = payload?.exp ? Number(payload.exp) * 1000 : 0;
-    return !exp || Date.now() >= exp;
-  } catch {
+    const now = Date.now();
+    const isExpired = !exp || now >= exp;
+    
+    console.log('Token validation:', {
+      expires: new Date(exp).toISOString(),
+      now: new Date(now).toISOString(),
+      isExpired,
+      timeUntilExpiry: exp - now
+    });
+    
+    return isExpired;
+  } catch (error) {
+    console.error('Token validation error:', error);
     return true;
   }
 }
