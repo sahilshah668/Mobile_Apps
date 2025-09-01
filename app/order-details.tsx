@@ -16,6 +16,7 @@ import { useDispatch } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import theme from '@/constants/theme';
+import { getStatusColor, getGradientColors, getShadowStyle, getBorderRadius, getSpacing } from '@/constants/themeUtils';
 import { fetchOrderDetails } from '@/store/orderSlice';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
@@ -101,25 +102,8 @@ const OrderDetailsScreen: React.FC = () => {
     return `$${price.toFixed(2)}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '#FF9800';
-      case 'confirmed':
-        return '#2196F3';
-      case 'processing':
-        return '#9C27B0';
-      case 'shipped':
-        return '#3F51B5';
-      case 'delivered':
-        return '#4CAF50';
-      case 'cancelled':
-        return '#F44336';
-      case 'refunded':
-        return '#FF5722';
-      default:
-        return '#9E9E9E';
-    }
+  const getOrderStatusColor = (status: string) => {
+    return getStatusColor(status, 'order');
   };
 
   const getStatusText = (status: string) => {
@@ -319,7 +303,7 @@ const OrderDetailsScreen: React.FC = () => {
                 <Text style={styles.paymentLabel}>Payment Status:</Text>
                 <Text style={[
                   styles.paymentValue,
-                  { color: order.paymentStatus === 'paid' ? '#4CAF50' : '#FF9800' }
+                  { color: order.paymentStatus === 'paid' ? theme.colors.success : theme.colors.warning }
                 ]}>
                   {order.paymentStatus ? order.paymentStatus.toUpperCase() : 'PENDING'}
                 </Text>
@@ -338,10 +322,10 @@ const OrderDetailsScreen: React.FC = () => {
                       styles.timelineDot,
                       { 
                         backgroundColor: status.status === 'cancelled' 
-                          ? '#F44336' 
+                          ? theme.colors.error 
                           : status.isCompleted 
                             ? theme.colors.primary 
-                            : '#E0E0E0' 
+                            : theme.colors.border 
                       }
                     ]}>
                       {status.isCompleted && (
@@ -352,11 +336,11 @@ const OrderDetailsScreen: React.FC = () => {
                       <View style={[
                         styles.timelineLine,
                         { 
-                          backgroundColor: status.status === 'cancelled' 
-                            ? '#F44336' 
-                            : status.isCompleted 
-                              ? theme.colors.primary 
-                              : '#E0E0E0' 
+                                                  backgroundColor: status.status === 'cancelled' 
+                          ? theme.colors.error 
+                          : status.isCompleted 
+                            ? theme.colors.primary 
+                            : theme.colors.border 
                         }
                       ]} />
                     )}
@@ -366,7 +350,7 @@ const OrderDetailsScreen: React.FC = () => {
                       styles.timelineLabel,
                       { 
                         color: status.status === 'cancelled' 
-                          ? '#F44336' 
+                          ? theme.colors.error 
                           : status.isCompleted 
                             ? theme.colors.text 
                             : theme.colors.subtitle 
@@ -377,7 +361,7 @@ const OrderDetailsScreen: React.FC = () => {
                     {status.isCurrent && (
                       <Text style={[
                         styles.timelineCurrent,
-                        { color: status.status === 'cancelled' ? '#F44336' : theme.colors.primary }
+                        { color: status.status === 'cancelled' ? theme.colors.error : theme.colors.primary }
                       ]}>
                         {status.status === 'cancelled' ? 'Order Cancelled' : 'Current Status'}
                       </Text>

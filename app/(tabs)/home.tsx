@@ -1,4 +1,5 @@
 import theme from '@/constants/theme';
+import { getGradientColors, getShadowStyle, getSpacing, getBorderRadius } from '@/constants/themeUtils';
 import { APP_CONFIG } from '../../config/appConfig';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { fetchHomeData } from '@/store/productSlice';
@@ -209,7 +210,7 @@ const HomeScreen: React.FC = () => {
           <View style={styles.sectionContainer}>
             <SectionHeader 
               title="Trending Now" 
-              customIcon={<IconSymbol name="star" size={16} color="#FFD700" />}
+              customIcon={<IconSymbol name="star" size={16} color={theme.colors.premium} />}
             />
             <FlatList
               data={homeData.featuredProducts}
@@ -290,7 +291,7 @@ const HomeScreen: React.FC = () => {
           <View style={styles.sectionContainer}>
             <SectionHeader 
               title="Just For You" 
-              customIcon={<IconSymbol name="star" size={16} color={theme.colors.primary} />}
+              customIcon={<IconSymbol name="star" size={16} color={theme.colors.accent} />}
             />
             <View style={styles.justForYouGrid}>
               {homeData.recommendations.slice(0, 4).map((product) => (
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    backgroundColor: `${theme.colors.premium}20`,
     paddingHorizontal: isSmallScreen ? 6 : 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
   },
   premiumText: {
     fontSize: isSmallScreen ? 9 : 10,
-    color: '#FFD700',
+    color: theme.colors.premium,
     fontWeight: 'bold',
     fontFamily: theme.fonts.bold,
   },
@@ -456,25 +457,17 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    ...getShadowStyle('medium'),
   },
   bannerContainer: {
     marginTop: 20,
-    marginHorizontal: theme.spacing.lg,
-    borderRadius: 20,
+    marginHorizontal: getSpacing('lg'),
+    borderRadius: getBorderRadius('xl'),
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 12,
+    ...getShadowStyle('large'),
   },
   sectionContainer: {
     marginTop: 32,
@@ -498,20 +491,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   productWrapper: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    ...getShadowStyle('small'),
     marginBottom: 8,
   },
   flashSaleContainer: {
     marginTop: 32,
-    marginHorizontal: theme.spacing.lg,
-    borderRadius: 20,
+    marginHorizontal: getSpacing('lg'),
+    borderRadius: getBorderRadius('xl'),
     overflow: 'hidden',
-    backgroundColor: '#FF6B6B',
-    shadowColor: '#FF6B6B',
+    backgroundColor: theme.colors.flashSale,
+    shadowColor: theme.colors.flashSale,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -521,7 +510,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: getSpacing('lg'),
     paddingTop: 20,
     paddingBottom: 16,
   },
@@ -547,12 +536,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.bold,
   },
   flashSaleList: {
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: getSpacing('lg'),
     paddingBottom: 20,
   },
   justForYouGrid: {
     flexDirection: 'column',
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: getSpacing('lg'),
     paddingBottom: 20,
     gap: 16,
   },

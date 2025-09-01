@@ -1,4 +1,5 @@
 import theme from '@/constants/theme';
+import { getShadowStyle } from '@/constants/themeUtils';
 import { WishlistItem } from '@/store/cartSlice';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
@@ -23,7 +24,7 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
           style={styles.removeButton}
           onPress={() => onRemove(item.id)}
         >
-          <Ionicons name="trash" size={16} color="#FF4444" />
+          <Ionicons name="trash" size={16} color={theme.colors.error} />
         </TouchableOpacity>
       </View>
       
@@ -65,11 +66,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...getShadowStyle('small'),
   },
   imageContainer: {
     position: 'relative',

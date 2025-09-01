@@ -1,4 +1,5 @@
 import theme from '@/constants/theme';
+import { getShadowStyle, getBorderRadius, getSpacing } from '@/constants/themeUtils';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -42,7 +43,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: theme.colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   disabledButton: {
-    backgroundColor: '#CCCCCC',
+    backgroundColor: theme.colors.surface,
   },
   checkoutText: {
     color: theme.colors.buttonText,

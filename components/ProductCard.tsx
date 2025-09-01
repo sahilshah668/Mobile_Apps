@@ -1,4 +1,5 @@
 import theme from '@/constants/theme';
+import { getStatusColor, getShadowStyle, getBorderRadius, getSpacing } from '@/constants/themeUtils';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
 import { addToCart, addToWishlist } from '@/store/cartSlice';
@@ -95,16 +96,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
     if (variant === 'flashSale') {
       badgeText = '-20%';
-      badgeColor = '#FF4444';
+      badgeColor = theme.colors.discount;
     } else if (product.isNew) {
       badgeText = 'New';
-      badgeColor = '#2ECC71';
+      badgeColor = theme.colors.success;
     } else if (product.isSale) {
       badgeText = 'Sale';
-      badgeColor = '#FF6B6B';
+      badgeColor = theme.colors.accent;
     } else if (product.isHot) {
       badgeText = 'Hot';
-      badgeColor = '#FF9500';
+      badgeColor = theme.colors.warning;
     }
 
     if (!badgeText) return null;

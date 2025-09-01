@@ -41,7 +41,7 @@ const FlashSaleTimer: React.FC<FlashSaleTimerProps> = ({
 
   return (
     <View style={styles.container}>
-      <IconSymbol name="time" size={16} color="#FF4444" />
+      <IconSymbol name="time" size={16} color={theme.colors.discount} />
       <Text style={styles.timerText}>
         {formatTime(timeLeft.hours)} {formatTime(timeLeft.minutes)} {formatTime(timeLeft.seconds)}
       </Text>
